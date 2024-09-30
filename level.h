@@ -1,42 +1,44 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
-#include "TinyXML/tinyxml2.h"
+#include <tinyxml2.h>
 #include <iostream>
-#include <map>
-#include <vector>
 #include <string>
-#include <algorithm>
+#include <vector>
+#include <map>
 
 class Object {
 public:
-    Object(float x, float y, float width, float height)
+    Object(float x = 0, float y = 0, float width = 0, float height = 0) 
         : rect(x, y, width, height) {}
 
-    int GetPropertyInt(const std::string& name);
-    float GetPropertyFloat(const std::string& name);
-    std::string GetPropertyString(const std::string& name);
+    int         GetPropertyInt(const std::string& name) const;
+    float       GetPropertyFloat(const std::string& name) const;
+    std::string GetPropertyString(const std::string& name) const;
 
     std::string name;
     std::string type;
-    std::map<std::string, std::string> properties;
     sf::FloatRect rect;
+    std::map<std::string, std::string> properties;
+    sf::Sprite sprite;
 };
 
-class TileMap : public sf::Drawable {
+class Level : public sf::Drawable {
 public:
-    ~TileMap();
+    bool loadFromFile(const std::string& filename); 
 
-    bool load(const std::string& tmx_file_path);
-    Object getObject(const std::string& name);
-    std::vector<Object> getObjectsByName(const std::string& name);
-    std::vector<Object> getObjectsByType(const std::string& type);
-    std::vector<Object>& getAllObjects();
+    Object               getObject(const std::string& name) const;
+    std::vector<Object>  getObjectsByName(const std::string& name) const;
+    std::vector<Object>  getObjectsByType(const std::string& type) const;
+    const std::vector<Object>& getAllObjects() const;
+    sf::Vector2i getTileSize() const;
 
 private:
-    void draw(sf::RenderTarget& target, sf::RenderStates states) const override;
+    virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override;
 
-    sf::Texture* texture = nullptr;
-    std::vector<sf::VertexArray> tile_layers;
+    int width = 0, height = 0, tileWidth = 0, tileHeight = 0;
+    int firstTileID = 0;
+    sf::Texture tilesetTexture;
+    std::vector<sf::VertexArray> tileLayers;
     std::vector<Object> objects;
 };
