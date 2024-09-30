@@ -1,158 +1,223 @@
 #include "level.h"
 
-TileMap::~TileMap() {
-    if (texture) {
-        delete texture;
-    }
+int Object::GetPropertyInt(const std::string& name) const {
+    return std::stoi(properties.at(name));
 }
 
-bool TileMap::load(const std::string& tmx_file_path) {
+float Object::GetPropertyFloat(const std::string& name) const {
+    return std::stof(properties.at(name));
+}
+
+std::string Object::GetPropertyString(const std::string& name) const {
+    return properties.at(name);
+}
+
+bool Level::loadFromFile(const std::string& filename) {
     tinyxml2::XMLDocument document;
-    if (document.LoadFile(tmx_file_path.c_str()) != tinyxml2::XML_SUCCESS) {
-        std::cout << "Loading file " << tmx_file_path << " failed..." << std::endl;
+    if (document.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) {
+        std::cerr << "Failed to load file: " << filename << std::endl;
         return false;
     }
 
-    tinyxml2::XMLElement* root_element = document.FirstChildElement("map");
-    const size_t tile_width = std::stoul(root_element->Attribute("tilewidth"));
-    const size_t tile_height = std::stoul(root_element->Attribute("tileheight"));
-    auto tileset = root_element->FirstChildElement("tileset");
-    const size_t tile_count = std::stoul(tileset->Attribute("tilecount"));
-    const size_t columns = std::stoul(tileset->Attribute("columns"));
-
-    auto image = tileset->FirstChildElement("image");
-    std::string path = image->Attribute("source");
-    while (!isalpha(path.front())) // Убираем лишние символы в начале строки
-        path.erase(0, 1);
-
-    texture = new sf::Texture();
-    if (!texture->loadFromFile(path))
+    tinyxml2::XMLElement* mapElement = document.FirstChildElement("map");
+    if (!mapElement) {
+        std::cerr << "No 'map' element found in file: " << filename << std::endl;
         return false;
+    }
 
-    std::vector<sf::Vector2f> texture_grid;
-    texture_grid.reserve(tile_count);
-    size_t rows = tile_count / columns;
-    for (size_t y = 0u; y < rows; ++y) {
-        for (size_t x = 0u; x < columns; ++x) {
-            texture_grid.emplace_back(sf::Vector2f((float)x * tile_width, (float)y * tile_height));
+    const char* tileWidthAttr = mapElement->Attribute("tilewidth");
+    const char* tileHeightAttr = mapElement->Attribute("tileheight");
+    const char* widthAttr = mapElement->Attribute("width");
+    const char* heightAttr = mapElement->Attribute("height");
+
+    if (!tileWidthAttr || !tileHeightAttr || !widthAttr || !heightAttr) {
+        std::cerr << "Map attributes missing in file: " << filename << std::endl;
+        return false;
+    }
+
+    tileWidth = std::stoi(tileWidthAttr);
+    tileHeight = std::stoi(tileHeightAttr);
+    width = std::stoi(widthAttr);
+    height = std::stoi(heightAttr);
+
+    // Loading tileset
+    tinyxml2::XMLElement* tilesetElement = mapElement->FirstChildElement("tileset");
+    if (!tilesetElement) {
+        std::cerr << "No 'tileset' element found in file: " << filename << std::endl;
+        return false;
+    }
+
+    const char* firstGidAttr = tilesetElement->Attribute("firstgid");
+    if (!firstGidAttr) {
+        std::cerr << "No 'firstgid' attribute in 'tileset' element" << std::endl;
+        return false;
+    }
+
+    firstTileID = std::stoi(firstGidAttr);
+
+    tinyxml2::XMLElement* imageElement = tilesetElement->FirstChildElement("image");
+    if (!imageElement) {
+        std::cerr << "No 'image' element found in 'tileset'" << std::endl;
+        return false;
+    }
+
+    const char* textureFile = imageElement->Attribute("source");
+    if (!textureFile) {
+        std::cerr << "No 'source' attribute in 'image' element" << std::endl;
+        return false;
+    }
+
+    if (!tilesetTexture.loadFromFile(textureFile)) {
+        std::cerr << "Failed to load tileset texture: " << textureFile << std::endl;
+        return false;
+    }
+
+    // Calculate the number of columns and rows in the tileset
+    int columns = tilesetTexture.getSize().x / tileWidth;
+    int rows = tilesetTexture.getSize().y / tileHeight;
+    std::vector<sf::IntRect> subRects;
+
+    for (int y = 0; y < rows; y++) {
+        for (int x = 0; x < columns; x++) {
+            sf::IntRect rect(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
+            subRects.push_back(rect);
         }
     }
 
-    for (auto layer = root_element->FirstChildElement("layer"); layer != nullptr; layer = layer->NextSiblingElement("layer")) {
-        const size_t width = std::stoul(layer->Attribute("width"));
-        const size_t height = std::stoul(layer->Attribute("height"));
+    // Parse tile layers
+    tinyxml2::XMLElement* layerElement = mapElement->FirstChildElement("layer");
+    while (layerElement) {
+        tinyxml2::XMLElement* dataElement = layerElement->FirstChildElement("data");
+        if (!dataElement) {
+            std::cerr << "No 'data' element in 'layer'" << std::endl;
+            layerElement = layerElement->NextSiblingElement("layer");
+            continue;
+        }
 
-        tinyxml2::XMLElement* data = layer->FirstChildElement("data");
-        std::string dirty_string = data->GetText(), buffer;
-        std::vector<size_t> csv_array;
-        csv_array.reserve(dirty_string.size());
+        const char* data = dataElement->GetText();
+        if (!data) {
+            std::cerr << "No text found in 'data' element" << std::endl;
+            layerElement = layerElement->NextSiblingElement("layer");
+            continue;
+        }
 
-        for (auto& character : dirty_string) {
-            if (isdigit(character))
-                buffer += character;
-            else if (!buffer.empty()) {
-                csv_array.push_back(std::stoi(buffer));
+        std::vector<int> tileNumbers;
+        std::string buffer;
+
+        for (char c : std::string(data)) {
+            if (isdigit(c)) {
+                buffer += c;
+            } else if (!buffer.empty()) {
+                tileNumbers.push_back(std::stoi(buffer));
                 buffer.clear();
             }
         }
-        csv_array.shrink_to_fit();
 
-        sf::VertexArray vertices;
-        vertices.setPrimitiveType(sf::Quads);
-        for (size_t y = 0u, index = 0u; y < height; ++y) {
-            for (size_t x = 0u; x < width; ++x, ++index) {
-                size_t tile_num = csv_array[index];
-                if (tile_num) {
-                    sf::Vertex leftTop, rightTop, rightBottom, leftBottom;
-                    leftTop.position = sf::Vector2f((float)x * tile_width, (float)y * tile_height);
-                    rightTop.position = sf::Vector2f(((float)x + 1) * tile_width, (float)y * tile_height);
-                    rightBottom.position = sf::Vector2f(((float)x + 1) * tile_width, (float)(y + 1) * tile_height);
-                    leftBottom.position = sf::Vector2f((float)x * tile_width, (float)(y + 1) * tile_height);
+        sf::VertexArray layerVertices(sf::Quads);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int tileGID = tileNumbers[y * width + x];
+                if (tileGID == 0) continue;
 
-                    leftTop.texCoords = sf::Vector2f(texture_grid[tile_num - 1].x, texture_grid[tile_num - 1].y);
-                    rightTop.texCoords = sf::Vector2f(texture_grid[tile_num - 1].x + tile_width, texture_grid[tile_num - 1].y);
-                    rightBottom.texCoords = sf::Vector2f(texture_grid[tile_num - 1].x + tile_width, texture_grid[tile_num - 1].y + tile_height);
-                    leftBottom.texCoords = sf::Vector2f(texture_grid[tile_num - 1].x, texture_grid[tile_num - 1].y + tile_height);
+                sf::Vertex quad[4];
+                quad[0].position = sf::Vector2f(x * tileWidth, y * tileHeight);
+                quad[1].position = sf::Vector2f((x + 1) * tileWidth, y * tileHeight);
+                quad[2].position = sf::Vector2f((x + 1) * tileWidth, (y + 1) * tileHeight);
+                quad[3].position = sf::Vector2f(x * tileWidth, (y + 1) * tileHeight);
 
-                    vertices.append(leftTop);
-                    vertices.append(rightTop);
-                    vertices.append(rightBottom);
-                    vertices.append(leftBottom);
+                int subRectIdx = tileGID - firstTileID;
+                sf::IntRect texRect = subRects[subRectIdx];
+
+                quad[0].texCoords = sf::Vector2f(texRect.left, texRect.top);
+                quad[1].texCoords = sf::Vector2f(texRect.left + texRect.width, texRect.top);
+                quad[2].texCoords = sf::Vector2f(texRect.left + texRect.width, texRect.top + texRect.height);
+                quad[3].texCoords = sf::Vector2f(texRect.left, texRect.top + texRect.height);
+
+                for (int i = 0; i < 4; i++) {
+                    layerVertices.append(quad[i]);
                 }
             }
         }
-        tile_layers.push_back(std::move(vertices));
+
+        tileLayers.push_back(layerVertices);
+        layerElement = layerElement->NextSiblingElement("layer");
     }
 
-    for (auto object_group = root_element->FirstChildElement("objectgroup"); object_group != nullptr; object_group = object_group->NextSiblingElement("objectgroup")) {
-        for (auto object = object_group->FirstChildElement("object"); object != nullptr; object = object->NextSiblingElement("object")) {
-            std::string object_name = object->Attribute("name") ? object->Attribute("name") : "";
-            std::string object_type = object->Attribute("type") ? object->Attribute("type") : "";
-            float x = std::stof(object->Attribute("x"));
-            float y = std::stof(object->Attribute("y"));
-            float width = object->Attribute("width") ? std::stof(object->Attribute("width")) : 0.0f;
-            float height = object->Attribute("height") ? std::stof(object->Attribute("height")) : 0.0f;
+    // Parse object layers
+    tinyxml2::XMLElement* objectGroupElement = mapElement->FirstChildElement("objectgroup");
+    while (objectGroupElement) {
+        tinyxml2::XMLElement* objectElement = objectGroupElement->FirstChildElement("object");
+        while (objectElement) {
+            float x = std::stof(objectElement->Attribute("x"));
+            float y = std::stof(objectElement->Attribute("y"));
+            float width = objectElement->Attribute("width") ? std::stof(objectElement->Attribute("width")) : 0;
+            float height = objectElement->Attribute("height") ? std::stof(objectElement->Attribute("height")) : 0;
 
-            Object new_object(x, y, width, height);
-            new_object.name = object_name;
-            new_object.type = object_type;
+            Object obj(x, y, width, height);
+            if (objectElement->Attribute("name")) obj.name = objectElement->Attribute("name");
+            if (objectElement->Attribute("type")) obj.type = objectElement->Attribute("type");
 
-            auto properties = object->FirstChildElement("properties");
-            if (properties) {
-                for (auto property = properties->FirstChildElement("property"); property != nullptr; property = property->NextSiblingElement("property")) {
-                    std::string name = property->Attribute("name") ? property->Attribute("name") : "";
-                    std::string value = property->Attribute("value") ? property->Attribute("value") : "";
-                    new_object.properties[name] = value;
+            tinyxml2::XMLElement* propertiesElement = objectElement->FirstChildElement("properties");
+            if (propertiesElement) {
+                tinyxml2::XMLElement* propertyElement = propertiesElement->FirstChildElement("property");
+                while (propertyElement) {
+                    const char* propName = propertyElement->Attribute("name");
+                    const char* propValue = propertyElement->Attribute("value");
+                    if (propName && propValue) {
+                        obj.properties[propName] = propValue;
+                    }
+                    propertyElement = propertyElement->NextSiblingElement("property");
                 }
             }
-            objects.emplace_back(std::move(new_object));
+
+            objects.push_back(obj);
+            objectElement = objectElement->NextSiblingElement("object");
         }
+        objectGroupElement = objectGroupElement->NextSiblingElement("objectgroup");
     }
 
     return true;
 }
 
-Object TileMap::getObject(const std::string& name) {
-    auto found = std::find_if(objects.begin(), objects.end(), [&](const Object& obj) {
-        return obj.name == name;
-    });
-    return *found;
+
+Object Level::getObject(const std::string& name) const {
+    for (const auto& obj : objects) {
+        if (obj.name == name) return obj;
+    }
+    throw std::runtime_error("Object not found");
 }
 
-std::vector<Object> TileMap::getObjectsByName(const std::string& name) {
-    std::vector<Object> objects_by_name;
-    std::copy_if(objects.begin(), objects.end(), std::back_inserter(objects_by_name), [&](const Object& obj) {
-        return obj.name == name;
-    });
-    return objects_by_name;
+std::vector<Object> Level::getObjectsByName(const std::string& name) const {
+    std::vector<Object> foundObjects;
+    for (const auto& obj : objects) {
+        if (obj.name == name) {
+            foundObjects.push_back(obj);
+        }
+    }
+    return foundObjects;
 }
 
-std::vector<Object> TileMap::getObjectsByType(const std::string& type) {
-    std::vector<Object> objects_by_type;
-    std::copy_if(objects.begin(), objects.end(), std::back_inserter(objects_by_type), [&](const Object& obj) {
-        return obj.type == type;
-    });
-    return objects_by_type;
+std::vector<Object> Level::getObjectsByType(const std::string& type) const {
+    std::vector<Object> foundObjects;
+    for (const auto& obj : objects) {
+        if (obj.type == type) {
+            foundObjects.push_back(obj);
+        }
+    }
+    return foundObjects;
 }
 
-std::vector<Object>& TileMap::getAllObjects() {
+const std::vector<Object>& Level::getAllObjects() const {
     return objects;
 }
 
-void TileMap::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-    for (const auto& layer : tile_layers) {
-        target.draw(layer, texture);
+sf::Vector2i Level::getTileSize() const {
+    return sf::Vector2i(tileWidth, tileHeight);
+}
+
+void Level::draw(sf::RenderTarget& target, sf::RenderStates states) const {
+    states.texture = &tilesetTexture;
+    for (const auto& layer : tileLayers) {
+        target.draw(layer, states);
     }
-}
-
-int Object::GetPropertyInt(const std::string& name) {
-    return std::stoi(properties[name]);
-}
-
-float Object::GetPropertyFloat(const std::string& name) {
-    return std::stof(properties[name]);
-}
-
-std::string Object::GetPropertyString(const std::string& name) {
-    return properties[name];
 }
