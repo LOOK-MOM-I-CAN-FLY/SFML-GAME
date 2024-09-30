@@ -1,33 +1,41 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include "/Users/sindi_hall/Downloads/SFML_ROOT/include/SFML/Graphics.hpp"
+#include "SFML/Graphics.hpp"
+#include "SFML/Window.hpp"
+#include <vector>
+#include <iostream>
 #include "Bullet.h"
-using namespace sf;
-
-class Bullet;
+#include "tinyxml2.h"
 
 class Player {
-private:
-    float x, y;
-
 public:
-    float w, h, dx, dy, speed;
-    int dir = 0;
-    int lastHorizontalDir;
-    String File;
-    Image image;
-    Texture texture;
-    Sprite sprite;
-    bool isMoving;
-    std::vector<Bullet> bullets;
-
-    Player(String F, float X, float Y, float W, float H);
+    Player(const std::string& textureFile, const std::string& tmxFile);  // Конструктор с загрузкой текстуры и карты
     void update(float time, int mapWidth, int mapHeight);
-    float getplayercoordinateX();
-    float getplayercoordinateY();
+    float getPlayerCoordinateX() const;
+    float getPlayerCoordinateY() const;
     void shoot();
     void updateBullets(float time);
+    sf::FloatRect getRect() const;
+    void checkCollisionWithMap(float dx, float dy);
+
+    std::vector<Bullet> bullets;  // Массив пуль
+
+    float x, y, w, h;  // Координаты и размеры игрока
+    float dx, dy;  // Изменения координат
+    float speed;  // Скорость игрока
+    int lastHorizontalDir;  // Последнее горизонтальное направление движения
+    bool isMoving;  // Флаг для проверки движения игрока
+    int dir;  // Текущее направление движения
+
+    sf::Texture texture;  // Текстура игрока
+    sf::Sprite sprite;  // Спрайт игрока
+    std::string textureFile;  // Имя файла текстуры
+
+    std::vector<sf::FloatRect> solidObjects;  // Вектор объектов для коллизий
+
+    void loadMap(const std::string& tmxFile);  // Метод загрузки карты
+    void initializePlayerPosition(const tinyxml2::XMLElement* playerObject);  // Инициализация позиции игрока
 };
 
 #endif
