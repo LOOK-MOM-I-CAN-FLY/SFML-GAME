@@ -1,33 +1,47 @@
 #include "Bullet.h"
 
-Bullet::Bullet(float X, float Y, float Dx, float Dy) {
-    x = X;
-    y = Y;
-    dx = Dx;  // Задаём горизонтальную скорость
-    dy = Dy;  // Задаём вертикальную скорость
-    lifetime = 5000;  // Время жизни пули 5 секунд
-    isAlive = true;
+Bullet::Bullet(float X, float Y, float Dx, float Dy) 
+    : x(X), y(Y), dx(Dx), dy(Dy), lifetime(5000), alive(true) {  // Инициализация через список
+    if (!texture.loadFromFile("images/bullet.png")) {
+        std::cerr << "Error: Failed to load bullet texture!" << std::endl;
+        alive = false;
+        return;
+    }
 
-
-    texture.loadFromFile("images/bullet.png");
     sprite.setTexture(texture);
-    sprite.setTextureRect(IntRect(0, 0, 21, 21));  // Определяем область текстуры
-    sprite.setScale(0.5, 0.5);  // Масштабируем спрайт
-
+    sprite.setTextureRect(sf::IntRect(0, 0, 21, 21));  // Размер текстуры пули
+    sprite.setScale(0.5f, 0.5f);  // Масштабирование
     sprite.setPosition(x, y);
 }
 
-void Bullet::update(float time) {
-    // Обновляем координаты пули с учётом скорости
+void Bullet::update(float time, const std::vector<sf::FloatRect>& solidObjects) {
+    if (!alive) return;  // Если пуля мертва, не обновляем
+
+    // Обновление координат пули
     x += dx * time;
     y += dy * time;
 
-    // Обновляем позицию спрайта
+    // Проверка столкновений
+    checkCollisionWithMap(solidObjects);
+
+    // Обновление позиции спрайта
     sprite.setPosition(x, y);
 
-    // Уменьшаем время жизни пули
+    // Уменьшение времени жизни пули
     lifetime -= time;
     if (lifetime <= 0) {
-        isAlive = false;
+        alive = false;
+    }
+}
+
+void Bullet::checkCollisionWithMap(const std::vector<sf::FloatRect>& solidObjects) {
+    sf::FloatRect bulletRect(x, y, sprite.getGlobalBounds().width, sprite.getGlobalBounds().height);
+
+    for (const auto& solid : solidObjects) {
+        if (bulletRect.intersects(solid)) {
+            // Если пуля пересекает solid объект, она уничтожается
+            alive = false;
+            return;
+        }
     }
 }
