@@ -1,223 +1,122 @@
 #include "level.h"
+#include <tinyxml2.h>
 
-int Object::GetPropertyInt(const std::string& name) const {
-    return std::stoi(properties.at(name));
-}
+TiledMap::TiledMap(const std::string& filePath, sf::RenderWindow& window)
+    : filePath(filePath), window(window) {}
 
-float Object::GetPropertyFloat(const std::string& name) const {
-    return std::stof(properties.at(name));
-}
-
-std::string Object::GetPropertyString(const std::string& name) const {
-    return properties.at(name);
-}
-
-bool Level::loadFromFile(const std::string& filename) {
-    tinyxml2::XMLDocument document;
-    if (document.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) {
-        std::cerr << "Failed to load file: " << filename << std::endl;
-        return false;
+void TiledMap::loadMap() {
+    tinyxml2::XMLDocument mapFile;
+    if (mapFile.LoadFile(filePath.c_str()) != tinyxml2::XML_SUCCESS) {
+        std::cerr << "Failed to load map file: " << filePath << std::endl;
+        return;
     }
 
-    tinyxml2::XMLElement* mapElement = document.FirstChildElement("map");
+    auto* mapElement = mapFile.FirstChildElement("map");
     if (!mapElement) {
-        std::cerr << "No 'map' element found in file: " << filename << std::endl;
-        return false;
+        std::cerr << "Invalid map format!" << std::endl;
+        return;
     }
 
-    const char* tileWidthAttr = mapElement->Attribute("tilewidth");
-    const char* tileHeightAttr = mapElement->Attribute("tileheight");
-    const char* widthAttr = mapElement->Attribute("width");
-    const char* heightAttr = mapElement->Attribute("height");
+    loadTilesets(mapElement);
+    loadLayers(mapElement);
+}
 
-    if (!tileWidthAttr || !tileHeightAttr || !widthAttr || !heightAttr) {
-        std::cerr << "Map attributes missing in file: " << filename << std::endl;
-        return false;
-    }
+void TiledMap::loadTilesets(tinyxml2::XMLElement* mapElement) {
+    for (auto* tilesetElement = mapElement->FirstChildElement("tileset");
+         tilesetElement; tilesetElement = tilesetElement->NextSiblingElement("tileset")) {
+        
+        Tileset tileset;
+        tileset.firstgid = tilesetElement->IntAttribute("firstgid");
+        tileset.tileWidth = tilesetElement->IntAttribute("tilewidth");
+        tileset.tileHeight = tilesetElement->IntAttribute("tileheight");
+        tileset.columns = tilesetElement->IntAttribute("columns");
 
-    tileWidth = std::stoi(tileWidthAttr);
-    tileHeight = std::stoi(tileHeightAttr);
-    width = std::stoi(widthAttr);
-    height = std::stoi(heightAttr);
-
-    // Loading tileset
-    tinyxml2::XMLElement* tilesetElement = mapElement->FirstChildElement("tileset");
-    if (!tilesetElement) {
-        std::cerr << "No 'tileset' element found in file: " << filename << std::endl;
-        return false;
-    }
-
-    const char* firstGidAttr = tilesetElement->Attribute("firstgid");
-    if (!firstGidAttr) {
-        std::cerr << "No 'firstgid' attribute in 'tileset' element" << std::endl;
-        return false;
-    }
-
-    firstTileID = std::stoi(firstGidAttr);
-
-    tinyxml2::XMLElement* imageElement = tilesetElement->FirstChildElement("image");
-    if (!imageElement) {
-        std::cerr << "No 'image' element found in 'tileset'" << std::endl;
-        return false;
-    }
-
-    const char* textureFile = imageElement->Attribute("source");
-    if (!textureFile) {
-        std::cerr << "No 'source' attribute in 'image' element" << std::endl;
-        return false;
-    }
-
-    if (!tilesetTexture.loadFromFile(textureFile)) {
-        std::cerr << "Failed to load tileset texture: " << textureFile << std::endl;
-        return false;
-    }
-
-    // Calculate the number of columns and rows in the tileset
-    int columns = tilesetTexture.getSize().x / tileWidth;
-    int rows = tilesetTexture.getSize().y / tileHeight;
-    std::vector<sf::IntRect> subRects;
-
-    for (int y = 0; y < rows; y++) {
-        for (int x = 0; x < columns; x++) {
-            sf::IntRect rect(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
-            subRects.push_back(rect);
+        auto* imageElement = tilesetElement->FirstChildElement("image");
+        if (imageElement) {
+            std::string imagePath = imageElement->Attribute("source");
+            if (!tileset.texture.loadFromFile(imagePath)) {
+                std::cerr << "Failed to load texture: " << imagePath << std::endl;
+                continue;
+            }
         }
+        tilesets.push_back(tileset);
     }
+}
 
-    // Parse tile layers
-    tinyxml2::XMLElement* layerElement = mapElement->FirstChildElement("layer");
-    while (layerElement) {
-        tinyxml2::XMLElement* dataElement = layerElement->FirstChildElement("data");
+void TiledMap::loadLayers(tinyxml2::XMLElement* mapElement) {
+    for (auto* layerElement = mapElement->FirstChildElement("layer");
+         layerElement; layerElement = layerElement->NextSiblingElement("layer")) {
+        
+        Layer layer;
+        layer.width = layerElement->IntAttribute("width");
+        layer.height = layerElement->IntAttribute("height");
+
+        auto* dataElement = layerElement->FirstChildElement("data");
         if (!dataElement) {
-            std::cerr << "No 'data' element in 'layer'" << std::endl;
-            layerElement = layerElement->NextSiblingElement("layer");
+            std::cerr << "Layer is missing data!" << std::endl;
             continue;
         }
 
-        const char* data = dataElement->GetText();
-        if (!data) {
-            std::cerr << "No text found in 'data' element" << std::endl;
-            layerElement = layerElement->NextSiblingElement("layer");
+        const char* encoding = dataElement->Attribute("encoding");
+        if (!encoding || std::string(encoding) != "csv") {
+            std::cerr << "Unsupported data encoding or missing data!" << std::endl;
             continue;
         }
 
-        std::vector<int> tileNumbers;
-        std::string buffer;
+        const char* csvData = dataElement->GetText();
+        if (!csvData) {
+            std::cerr << "Failed to read CSV data from layer." << std::endl;
+            continue;
+        }
 
-        for (char c : std::string(data)) {
-            if (isdigit(c)) {
-                buffer += c;
-            } else if (!buffer.empty()) {
-                tileNumbers.push_back(std::stoi(buffer));
-                buffer.clear();
+        // Обрабатываем CSV данные
+        std::istringstream dataStream(csvData);
+        std::string tileId;
+        while (std::getline(dataStream, tileId, ',')) {
+            try {
+                int id = std::stoi(tileId);
+                layer.tiles.push_back(id);  // Добавляем тайл в слой
+            } catch (const std::invalid_argument& e) {
+                std::cerr << "Invalid tile ID encountered: " << tileId << std::endl;
+                continue;
             }
         }
 
-        sf::VertexArray layerVertices(sf::Quads);
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int tileGID = tileNumbers[y * width + x];
-                if (tileGID == 0) continue;
-
-                sf::Vertex quad[4];
-                quad[0].position = sf::Vector2f(x * tileWidth, y * tileHeight);
-                quad[1].position = sf::Vector2f((x + 1) * tileWidth, y * tileHeight);
-                quad[2].position = sf::Vector2f((x + 1) * tileWidth, (y + 1) * tileHeight);
-                quad[3].position = sf::Vector2f(x * tileWidth, (y + 1) * tileHeight);
-
-                int subRectIdx = tileGID - firstTileID;
-                sf::IntRect texRect = subRects[subRectIdx];
-
-                quad[0].texCoords = sf::Vector2f(texRect.left, texRect.top);
-                quad[1].texCoords = sf::Vector2f(texRect.left + texRect.width, texRect.top);
-                quad[2].texCoords = sf::Vector2f(texRect.left + texRect.width, texRect.top + texRect.height);
-                quad[3].texCoords = sf::Vector2f(texRect.left, texRect.top + texRect.height);
-
-                for (int i = 0; i < 4; i++) {
-                    layerVertices.append(quad[i]);
-                }
-            }
-        }
-
-        tileLayers.push_back(layerVertices);
-        layerElement = layerElement->NextSiblingElement("layer");
+        layers.push_back(layer);
     }
+}
 
-    // Parse object layers
-    tinyxml2::XMLElement* objectGroupElement = mapElement->FirstChildElement("objectgroup");
-    while (objectGroupElement) {
-        tinyxml2::XMLElement* objectElement = objectGroupElement->FirstChildElement("object");
-        while (objectElement) {
-            float x = std::stof(objectElement->Attribute("x"));
-            float y = std::stof(objectElement->Attribute("y"));
-            float width = objectElement->Attribute("width") ? std::stof(objectElement->Attribute("width")) : 0;
-            float height = objectElement->Attribute("height") ? std::stof(objectElement->Attribute("height")) : 0;
+void TiledMap::draw(sf::RenderWindow& window) {
+    for (const auto& layer : layers) {
+        for (int y = 0; y < layer.height; ++y) {
+            for (int x = 0; x < layer.width; ++x) {
+                int tileId = layer.tiles[y * layer.width + x];
+                if (tileId == 0) continue;  // Пропускаем пустые тайлы
 
-            Object obj(x, y, width, height);
-            if (objectElement->Attribute("name")) obj.name = objectElement->Attribute("name");
-            if (objectElement->Attribute("type")) obj.type = objectElement->Attribute("type");
-
-            tinyxml2::XMLElement* propertiesElement = objectElement->FirstChildElement("properties");
-            if (propertiesElement) {
-                tinyxml2::XMLElement* propertyElement = propertiesElement->FirstChildElement("property");
-                while (propertyElement) {
-                    const char* propName = propertyElement->Attribute("name");
-                    const char* propValue = propertyElement->Attribute("value");
-                    if (propName && propValue) {
-                        obj.properties[propName] = propValue;
+                const Tileset* tileset = nullptr;
+                for (const auto& ts : tilesets) {
+                    if (tileId >= ts.firstgid) {
+                        tileset = &ts;
+                    } else {
+                        break;
                     }
-                    propertyElement = propertyElement->NextSiblingElement("property");
+                }
+
+                if (tileset) {
+                    int localId = tileId - tileset->firstgid;
+                    int tx = (localId % tileset->columns) * tileset->tileWidth;
+                    int ty = (localId / tileset->columns) * tileset->tileHeight;
+
+                    sf::Sprite sprite;
+                    sprite.setTexture(tileset->texture);
+                    sprite.setTextureRect(sf::IntRect(tx, ty, tileset->tileWidth, tileset->tileHeight));
+                    sprite.setPosition(x * tileset->tileWidth, y * tileset->tileHeight);
+
+                    window.draw(sprite);
+                } else {
+                    std::cerr << "No matching tileset for tile ID: " << tileId << std::endl;
                 }
             }
-
-            objects.push_back(obj);
-            objectElement = objectElement->NextSiblingElement("object");
         }
-        objectGroupElement = objectGroupElement->NextSiblingElement("objectgroup");
-    }
-
-    return true;
-}
-
-
-Object Level::getObject(const std::string& name) const {
-    for (const auto& obj : objects) {
-        if (obj.name == name) return obj;
-    }
-    throw std::runtime_error("Object not found");
-}
-
-std::vector<Object> Level::getObjectsByName(const std::string& name) const {
-    std::vector<Object> foundObjects;
-    for (const auto& obj : objects) {
-        if (obj.name == name) {
-            foundObjects.push_back(obj);
-        }
-    }
-    return foundObjects;
-}
-
-std::vector<Object> Level::getObjectsByType(const std::string& type) const {
-    std::vector<Object> foundObjects;
-    for (const auto& obj : objects) {
-        if (obj.type == type) {
-            foundObjects.push_back(obj);
-        }
-    }
-    return foundObjects;
-}
-
-const std::vector<Object>& Level::getAllObjects() const {
-    return objects;
-}
-
-sf::Vector2i Level::getTileSize() const {
-    return sf::Vector2i(tileWidth, tileHeight);
-}
-
-void Level::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-    states.texture = &tilesetTexture;
-    for (const auto& layer : tileLayers) {
-        target.draw(layer, states);
     }
 }
