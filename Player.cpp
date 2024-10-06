@@ -56,28 +56,8 @@ void Player::loadMap(const std::string& tmxFile) {
             }
         }
 
-        // Если это группа с игроком
-        if (groupName && std::string(groupName) == "PLayer") {
-            XMLElement* object = objectGroup->FirstChildElement("object");
-            while (object) {
-                const char* objectName = object->Attribute("name");
-                if (objectName && std::string(objectName) == "Player") {
-                    initializePlayerPosition(object);
-                }
-                object = object->NextSiblingElement("object");
-            }
-        }
-
         objectGroup = objectGroup->NextSiblingElement("objectgroup");
     }
-}
-
-
-void Player::initializePlayerPosition(const XMLElement* playerObject) {
-    // Инициализация позиции игрока
-    x = playerObject->FloatAttribute("x");
-    y = playerObject->FloatAttribute("y");
-    sprite.setPosition(x, y);
 }
 
 void Player::update(float time, int mapWidth, int mapHeight) {
@@ -127,24 +107,53 @@ void Player::updateBullets(float time) {
         bullet.update(time, solidObjects);  // Проверяем столкновения с объектами
     }
 
-bullets.erase(
-    std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& b) { return !b.isAlive(); }),  // Добавь скобки здесь
-    bullets.end()
-);
-
+    bullets.erase(
+        std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& b) { return !b.isAlive(); }),
+        bullets.end()
+    );
 }
 
 sf::FloatRect Player::getRect() const {
     return sf::FloatRect(x, y, w, h);
 }
 
+
+// Метод для проверки коллизий с картой
 void Player::checkCollisionWithMap(float dx, float dy) {
-    for (const auto& solid : solidObjects) {
-        if (getRect().intersects(solid)) {
-            if (dy > 0) { y = solid.top - h; dy = 0; }  // Снизу
-            if (dy < 0) { y = solid.top + solid.height; dy = 0; }  // Сверху
-            if (dx > 0) { x = solid.left - w; dx = 0; }  // Справа
-            if (dx < 0) { x = solid.left + solid.width; dx = 0; }  // Слева
+    // Проходим по каждому слою
+    for (const auto& layer : tiledMap->layers) {  // Обращаемся к полю layers напрямую
+        for (int y = 0; y < layer.height; ++y) {
+            for (int x = 0; x < layer.width; ++x) {
+                int tileId = layer.tiles[y * layer.width + x];
+                if (tileId == 0) continue;  // Пропускаем пустые тайлы
+
+                // Определяем размеры тайла
+                const int tileWidth = 32;  // Используй фактический размер тайла с карты
+                const int tileHeight = 32;
+
+                // Проверяем коллизию игрока с текущим тайлом
+                sf::FloatRect playerBounds(x + dx, y + dy, w, h);
+                sf::FloatRect tileBounds(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
+
+                if (playerBounds.intersects(tileBounds)) {
+                    // Обработка столкновений
+                    if (dy > 0) {
+                        y = tileBounds.top - h;  // Игрок приземляется на поверхность
+                        dy = 0;
+                        isOnGround = true;
+                    }
+                    if (dy < 0) {
+                        y = tileBounds.top + tileHeight;  // Столкновение с потолком
+                        dy = 0;
+                    }
+                    if (dx > 0) {
+                        x = tileBounds.left - w;  // Столкновение справа
+                    }
+                    if (dx < 0) {
+                        x = tileBounds.left + tileWidth;  // Столкновение слева
+                    }
+                }
+            }
         }
     }
 }
