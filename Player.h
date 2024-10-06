@@ -7,6 +7,8 @@
 #include <iostream>
 #include "Bullet.h"
 #include "tinyxml2.h"
+#include "level.h"
+
 
 class Player {
 public:
@@ -19,6 +21,7 @@ public:
     sf::FloatRect getRect() const;
     void checkCollisionWithMap(float dx, float dy);
 
+
     std::vector<Bullet> bullets;  // Массив пуль
 
     float x, y, w, h;  // Координаты и размеры игрока
@@ -27,13 +30,14 @@ public:
     int lastHorizontalDir;  // Последнее горизонтальное направление движения
     bool isMoving;  // Флаг для проверки движения игрока
     int dir;  // Текущее направление движения
-
+    bool isOnGround = false;
+    
     sf::Texture texture;  // Текстура игрока
     sf::Sprite sprite;  // Спрайт игрока
     std::string textureFile;  // Имя файла текстуры
 
     std::vector<sf::FloatRect> solidObjects;  // Вектор объектов для коллизий
-
+    TiledMap* tiledMap;
     void loadMap(const std::string& tmxFile);  // Метод загрузки карты
     void initializePlayerPosition(const tinyxml2::XMLElement* playerObject);  // Инициализация позиции игрока
 };
