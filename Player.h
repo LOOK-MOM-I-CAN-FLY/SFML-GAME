@@ -1,45 +1,45 @@
-#ifndef PLAYER_H
-#define PLAYER_H
-
-#include "SFML/Graphics.hpp"
-#include "SFML/Window.hpp"
+#pragma once
+#include <SFML/Graphics.hpp>
 #include <vector>
-#include <iostream>
+#include <string>
 #include "Bullet.h"
-#include "tinyxml2.h"
 #include "level.h"
-
 
 class Player {
 public:
-    Player(const std::string& textureFile, const std::string& tmxFile);  // Конструктор с загрузкой текстуры и карты
-    void update(float time, int mapWidth, int mapHeight);
-    float getPlayerCoordinateX() const;
-    float getPlayerCoordinateY() const;
-    void shoot();
-    void updateBullets(float time);
-    sf::FloatRect getRect() const;
+    // Конструктор
+    Player(const std::string& textureFile, Level& level);
+
+    // Основные переменные игрока
+    float x, y;               // Позиция игрока
+    float dx, dy;             // Скорость по осям
+    float speed;              // Скорость игрока
+    int w, h;                 // Размеры игрока
+    int dir;                  // Направление движения (0 - вправо, 1 - влево, 2 - вниз, 3 - вверх)
+    bool isMoving;            // Флаг движения
+    bool isOnGround;          // Флаг нахождения на земле
+
+    // Текстура и спрайт игрока
+    sf::Texture texture;
+    sf::Sprite sprite;
+
+    // Список пуль
+    std::vector<Bullet> bullets;
+
+    // Функции игрока
+    void update(float time);                // Обновление состояния игрока
+    void updateBullets(float time);          // Обновление состояния пуль
+    void shoot();                           // Стрельба
+    sf::FloatRect getRect() const;          // Получение границ игрока
+    int GetWidth() const;
+    int GetHeight() const;
+
+private:
+    // Ссылка на уровень для проверки коллизий и взаимодействия
+    Level& level;
+
+    int lastHorizontalDir;                  // Последнее горизонтальное направление (0 - вправо, 1 - влево)
+
+    // Проверка столкновений с картой
     void checkCollisionWithMap(float dx, float dy);
-
-
-    std::vector<Bullet> bullets;  // Массив пуль
-
-    float x, y, w, h;  // Координаты и размеры игрока
-    float dx, dy;  // Изменения координат
-    float speed;  // Скорость игрока
-    int lastHorizontalDir;  // Последнее горизонтальное направление движения
-    bool isMoving;  // Флаг для проверки движения игрока
-    int dir;  // Текущее направление движения
-    bool isOnGround = false;
-    
-    sf::Texture texture;  // Текстура игрока
-    sf::Sprite sprite;  // Спрайт игрока
-    std::string textureFile;  // Имя файла текстуры
-
-    std::vector<sf::FloatRect> solidObjects;  // Вектор объектов для коллизий
-    TiledMap* tiledMap;
-    void loadMap(const std::string& tmxFile);  // Метод загрузки карты
-    void initializePlayerPosition(const tinyxml2::XMLElement* playerObject);  // Инициализация позиции игрока
 };
-
-#endif
