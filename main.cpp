@@ -8,9 +8,8 @@ void handleInput(Player& player, float moveSpeed, bool& isOnGround, float jumpSp
     player.speed = 0;
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
         player.dir = 1;  // Движение влево
-        player.speed = moveSpeed;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+        player.speed = -moveSpeed;  // Отрицательная скорость для движения влево
+    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
         player.dir = 0;  // Движение вправо
         player.speed = moveSpeed;
     }
@@ -24,73 +23,66 @@ void handleInput(Player& player, float moveSpeed, bool& isOnGround, float jumpSp
 
 // Функция применения гравитации
 void applyGravity(Player& player, bool& isOnGround, float& verticalSpeed, float gravity, float time) {
-    // Применение гравитации
     if (!isOnGround) {
         verticalSpeed += gravity * time;
         player.dy = verticalSpeed;
     }
 
-    // Проверяем, находится ли игрок на земле
     if (player.dy == 0) {
         isOnGround = true;
         verticalSpeed = 0;  // Останавливаем вертикальное движение
     } else {
-        isOnGround = false;  // Если dy не 0, игрок в воздухе
+        isOnGround = false;
     }
 }
 
 // Функция отрисовки
-void render(sf::RenderWindow& window, TiledMap& tiledMap, Player& player) {
-    // Очищаем экран
+void render(sf::RenderWindow& window, Level& level, Player& player) {
     window.clear();
 
-    // Рисуем карту
-    tiledMap.draw(window);
+    // Рисуем карту уровня
+    level.Draw(window);
 
     // Рисуем игрока
     window.draw(player.sprite);
 
-    // Рисуем все пули
+    // Рисуем пули
     for (const auto& bullet : player.bullets) {
-        if (bullet.isAlive()) {  // Проверяем, активна ли пуля перед её рисованием
+        if (bullet.isAlive()) {
             window.draw(bullet.getSprite());
         }
     }
 
-    // Отображаем кадр
     window.display();
 }
 
 int main() {
-    // Создаем окно
     sf::RenderWindow window(sf::VideoMode(1280, 800), "Biker of Death");
 
-    // Создаем и загружаем карту уровня
-    TiledMap tiledMap("biker_of_death.tmx", window);
-    std::cout << "Загрузка уровня...\n";
-    tiledMap.loadMap();
+    // Загружаем карту уровня из JSON
+    Level level;
+    if (!level.LoadFromFile("biker_of_death.json")) {
+        std::cerr << "Ошибка загрузки карты!\n";
+        return -1;
+    }
 
     // Создаем объект игрока и задаем начальные координаты
-    Player player("biker.png", "biker_of_death.tmx");
-    player.x = 100;  // Начальные координаты игрока
+    Player player("biker.png", level);
+    player.x = 100;
     player.y = 100;
-    player.sprite.setPosition(player.x, player.y);  // Задаем позицию спрайта игрока
+    player.sprite.setPosition(player.x, player.y);
 
-    // Основные игровые параметры
     sf::Clock clock;
     bool isOnGround = false;
     float jumpSpeed = 0.35f;
     float gravity = 0.0005f;
     float verticalSpeed = 0.0f;
-    const float moveSpeed = 0.1f;  // Скорость движения игрока
+    const float moveSpeed = 0.1f;
 
-    // Основной игровой цикл
     while (window.isOpen()) {
-        // Рассчитываем время, прошедшее с прошлого кадра
-        float time = clock.getElapsedTime().asSeconds();  // Время в секундах для стабильности
+        float time = clock.getElapsedTime().asSeconds();
         clock.restart();
 
-        // Обрабатываем события окна
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed) {
@@ -98,20 +90,12 @@ int main() {
             }
         }
 
-        // Обработка ввода
         handleInput(player, moveSpeed, isOnGround, jumpSpeed, verticalSpeed);
-
-        // Применение гравитации
         applyGravity(player, isOnGround, verticalSpeed, gravity, time);
-
-        // Обновляем положение игрока
-        player.update(time, 1280, 800);
-
-        // Обновляем пули (движение и столкновения)
+        player.update(time);
         player.updateBullets(time);
 
-        // Отрисовка
-        render(window, tiledMap, player);
+        render(window, level, player);
     }
 
     return 0;
