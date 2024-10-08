@@ -1,44 +1,59 @@
-#pragma once
+#ifndef LEVEL_H
+#define LEVEL_H
 
 #include <SFML/Graphics.hpp>
-#include <tinyxml2.h>
-#include <iostream>
 #include <string>
 #include <vector>
 #include <map>
+#include <fstream>
+#include <iostream>
+#include <nlohmann/json.hpp>
 
 class Object {
 public:
-    Object(float x = 0, float y = 0, float width = 0, float height = 0) 
-        : rect(x, y, width, height) {}
-
-    int         GetPropertyInt(const std::string& name) const;
-    float       GetPropertyFloat(const std::string& name) const;
-    std::string GetPropertyString(const std::string& name) const;
-
     std::string name;
     std::string type;
-    sf::FloatRect rect;
+    sf::IntRect rect;
     std::map<std::string, std::string> properties;
     sf::Sprite sprite;
+
+    int GetPropertyInt(const std::string& name);
+    float GetPropertyFloat(const std::string& name);
+    std::string GetPropertyString(const std::string& name);
 };
 
-class Level : public sf::Drawable {
+class Layer {
 public:
-    bool loadFromFile(const std::string& filename); 
+    float opacity;
+    std::vector<sf::Sprite> tiles;
+};
 
-    Object               getObject(const std::string& name) const;
-    std::vector<Object>  getObjectsByName(const std::string& name) const;
-    std::vector<Object>  getObjectsByType(const std::string& type) const;
-    const std::vector<Object>& getAllObjects() const;
-    sf::Vector2i getTileSize() const;
+class Level {
+public:
+    // Методы загрузки карты
+    bool LoadFromFile(const std::string& filename);
+
+    // Получение объектов по имени
+    Object GetObject(const std::string& name);
+    std::vector<Object> GetObjects(const std::string& name);
+
+    // Получение размера тайлов
+    sf::Vector2i GetTileSize();
+
+    // Отрисовка карты
+    void Draw(sf::RenderWindow& window);
+    int GetWidth() const;
+    int GetHeight() const;
+
 
 private:
-    virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override;
+    int width, height;          // Ширина и высота карты в тайлах
+    int tileWidth, tileHeight;  // Размеры тайлов
 
-    int width = 0, height = 0, tileWidth = 0, tileHeight = 0;
-    int firstTileID = 0;
-    sf::Texture tilesetTexture;
-    std::vector<sf::VertexArray> tileLayers;
-    std::vector<Object> objects;
+    sf::Texture tilesetImage;   // Текстура для тайлов
+
+    std::vector<Object> objects;   // Все объекты на карте
+    std::vector<Layer> layers;     // Слои карты
 };
+
+#endif // LEVEL_H
