@@ -61,7 +61,7 @@ int main() {
 
     // Загружаем карту уровня из JSON
     Level level;
-    if (!level.LoadFromFile("biker_of_death.json")) {
+    if (!level.LoadFromFile("map_json.tmj")) {
         std::cerr << "Ошибка загрузки карты!\n";
         return -1;
     }
@@ -74,10 +74,12 @@ int main() {
 
     sf::Clock clock;
     bool isOnGround = false;
-    float jumpSpeed = 0.35f;
-    float gravity = 0.0005f;
-    float verticalSpeed = 0.0f;
-    const float moveSpeed = 0.1f;
+
+    // Увеличенные значения скорости и гравитации
+    float jumpSpeed = 10.7f;  // Увеличиваем силу прыжка
+    float gravity = 1.0015f; // Увеличиваем силу гравитации для более быстрой посадки
+    float verticalSpeed = 1.0f;
+    const float moveSpeed = 1.2f;  // Увеличиваем скорость передвижения
 
     while (window.isOpen()) {
         float time = clock.getElapsedTime().asSeconds();
