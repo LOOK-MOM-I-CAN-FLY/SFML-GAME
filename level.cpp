@@ -103,7 +103,7 @@ bool Level::LoadFromFile(const std::string& filename) {
                     object.rect = sf::IntRect(x, y, objectData.value("width", 0), objectData.value("height", 0));
 
                     if (objectData.contains("gid")) {
-                        int gid = objectData["gid"] - levelData["tilesets"][0]["firstgid"].get<int>();
+                        int gid = objectData["gid"].get<int>() - levelData["tilesets"][0]["firstgid"].get<int>();
                         object.sprite.setTexture(tilesetImage);
                         object.sprite.setTextureRect(subRects[gid]);
                         object.sprite.setPosition(x, y);
