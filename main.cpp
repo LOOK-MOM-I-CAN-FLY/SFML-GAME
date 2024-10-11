@@ -76,10 +76,10 @@ int main() {
     bool isOnGround = false;
 
     // Увеличенные значения скорости и гравитации
-    float jumpSpeed = 10.7f;  // Увеличиваем силу прыжка
-    float gravity = 1.0015f; // Увеличиваем силу гравитации для более быстрой посадки
-    float verticalSpeed = 1.0f;
-    const float moveSpeed = 1.2f;  // Увеличиваем скорость передвижения
+    float jumpSpeed = 100.7f;  // Увеличиваем силу прыжка
+    float gravity = 10.0015f; // Увеличиваем силу гравитации для более быстрой посадки
+    float verticalSpeed = 10.0f;
+    const float moveSpeed = 10.2f;  // Увеличиваем скорость передвижения
 
     while (window.isOpen()) {
         float time = clock.getElapsedTime().asSeconds();
