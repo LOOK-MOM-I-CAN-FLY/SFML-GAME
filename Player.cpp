@@ -23,45 +23,37 @@ Player::Player(const std::string& textureFile, Level& level) : level(level) {
 void Player::update(float time) {
     isMoving = false;
 
-    // Гравитация всегда действует, если не на земле
+    // Применяем гравитацию, если не на земле
     const float gravity = 0.0005f;
     if (!isOnGround) {
         dy += gravity * time;
-    } else {
-        dy = 0; // Обнуляем вертикальную скорость, когда на земле
     }
 
     // Управление движением
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
-        speed = 0.1f;
-        dx = speed;
-        dir = 0;  // Вправо
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+        dx = speed; // Движение вправо
+        dir = 0;
         isMoving = true;
-    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
-        speed = 0.1f;
-        dx = -speed;
-        dir = 1;  // Влево
+    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+        dx = -speed; // Движение влево
+        dir = 1;
         isMoving = true;
     } else {
-        dx = 0;  // Если не двигается, обнуляем скорость
+        dx = 0; // Остановка, если нет ввода
     }
 
     // Прыжок только если на земле
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && isOnGround) {
-        dy = -0.35f;  // Скорость прыжка вверх
-        isOnGround = false;  // Во время прыжка не на земле
+    if (isOnGround && sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+        dy = -0.35f; // Прыжок
+        isOnGround = false;
     }
 
-    // Диагностика
-    std::cout << "Player position: (" << x << ", " << y << ")"
-              << " Speed: (" << dx << ", " << dy << ")" << " isOnGround: " << isOnGround << std::endl;
-
-    // Обновление позиции
+    // Обновляем позиции
     x += dx * time;
-    checkCollisionWithMap(dx, 0);  // Проверяем горизонтальные коллизии
+    checkCollisionWithMap(dx, 0); // Проверяем коллизии по оси X
 
     y += dy * time;
-    checkCollisionWithMap(0, dy);  // Проверяем вертикальные коллизии
+    checkCollisionWithMap(0, dy); // Проверяем коллизии по оси Y
 
     // Ограничение игрока рамками карты
     int mapWidth = level.GetTileSize().x * level.GetWidth();
@@ -72,8 +64,40 @@ void Player::update(float time) {
     if (x + w > mapWidth) x = mapWidth - w;
     if (y + h > mapHeight) y = mapHeight - h;
 
-    sprite.setPosition(x, y);  // Обновляем позицию спрайта
+    sprite.setPosition(x, y); // Обновляем позицию спрайта
+
+    std::cout << "Player position: (" << x << ", " << y << ")"
+              << " Speed: (" << dx << ", " << dy << ")" << " isOnGround: " << isOnGround << std::endl;
 }
+
+void Player::checkCollisionWithMap(float Dx, float Dy) {
+    isOnGround = false; // По умолчанию считаем, что игрок не на земле
+
+    for (const auto& object : level.GetObjects("solid")) {
+        sf::FloatRect playerBounds(x + Dx, y + Dy, w, h);
+
+        if (playerBounds.intersects(sf::FloatRect(object.rect))) {
+            // Проверяем коллизии по вертикали (Dy)
+            if (Dy > 0) {  // Падение вниз
+                y = object.rect.top - h;
+                dy = 0;
+                isOnGround = true; // Игрок на земле
+            } else if (Dy < 0) {  // Прыжок вверх
+                y = object.rect.top + object.rect.height;
+                dy = 0;
+            }
+
+            // Проверяем коллизии по горизонтали (Dx)
+            if (Dx > 0) {  // Движение вправо
+                x = object.rect.left - w;
+            } else if (Dx < 0) {  // Движение влево
+                x = object.rect.left + object.rect.width;
+            }
+        }
+    }
+}
+
+
 
 void Player::shoot() {
     float bulletSpeed = 0.3f;
@@ -85,45 +109,19 @@ void Player::shoot() {
 
 void Player::updateBullets(float time) {
     std::vector<sf::FloatRect> collisionRects;
-    for (const auto& obj : level.GetObjects("collision")) {
-        collisionRects.push_back(sf::FloatRect(obj.rect));  // Преобразуем объекты карты
+    for (const auto& obj : level.GetObjects("solid")) {
+        collisionRects.push_back(sf::FloatRect(obj.rect));
     }
 
-    for (auto& bullet : bullets) {
-        bullet.update(time, collisionRects);
-    }
-
-    // Удаляем неактивные пули
-    bullets.erase(
-        std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& b) { return !b.isAlive(); }),
-        bullets.end()
-    );
+    // Обновляем пули и проверяем их коллизии
+    bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+        [&collisionRects, time](Bullet& bullet) {
+            bullet.update(time, collisionRects);
+            return !bullet.isAlive();  // Удаляем неактивные пули
+        }), bullets.end());
 }
+
 
 sf::FloatRect Player::getRect() const {
     return sf::FloatRect(x, y, w, h);
-}
-
-void Player::checkCollisionWithMap(float dx, float dy) {
-    for (const auto& object : level.GetObjects("collision")) {
-        sf::FloatRect playerBounds(x + dx, y + dy, w, h);
-
-        if (playerBounds.intersects(sf::FloatRect(object.rect))) {
-            if (dy > 0) {  // Падение вниз
-                y = object.rect.top - h;
-                dy = 0;
-                isOnGround = true;  // На земле
-            }
-            if (dy < 0) {  // Прыжок вверх
-                y = object.rect.top + object.rect.height;
-                dy = 0;
-            }
-            if (dx > 0) {  // Движение вправо
-                x = object.rect.left - w;
-            }
-            if (dx < 0) {  // Движение влево
-                x = object.rect.left + object.rect.width;
-            }
-        }
-    }
 }
