@@ -9,12 +9,12 @@
 #include "Bonus.h"
 #include "Menu.h"
 
-// Функция отрисовки
+
 void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<Monster>& allmons, std::vector<Bonus>& allbonuses) {
     window.setView(view);  // Устанавливаем камеру перед отрисовкой
     window.clear();
 
-    // Рисуем карту уровня
+
     level.Draw(window);
 
   ///healtbars
@@ -29,7 +29,7 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
                    
 
                     
-    // Рисуем игрока bhealth barring
+
     if (player.isAlive) {
         window.draw(player.sprite);
 
@@ -41,7 +41,7 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
         window.draw(hpbar); // Draw the rectangle
 
 
-        // shiedbarring
+
             hpbar.setFillColor(sf::Color::Yellow);  
             hpbar.setSize( sf::Vector2f(  118.0f * (player.stats["shield"]/player.stats["shield_max"]) , 16.f));
             hpbar_back.setPosition(player.x, player.y+70+16);     
@@ -64,7 +64,7 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
     circleMonster.setOutlineThickness(2.f);                  // Толщина обводки
 
 
-     // Рисуем пули
+
      if (player.isAlive) { 
     for (  auto& bullet : player.bullets) {
         if (bullet._isAlive()) {
@@ -76,7 +76,7 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
     }
     }
 
-    // Рисуем  Bonuses
+
     for (  auto& bonus : allbonuses) {
             if (!bonus._isAlive()) { continue ;}              
             window.draw(bonus.getSprite());            
@@ -85,7 +85,7 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
      
     
 
-     // Рисуем монстров перед игроком
+
     for (auto& monster : allmons) {
                 if (monster._isAlive()) { 
                 for (  auto& bullet : monster.bullets) {
@@ -123,18 +123,18 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
 int main() {
     sf::RenderWindow window(sf::VideoMode(1280, 800), "Biker of Death");
 
-    //Создаем объект меню
-    Menu menu(window, "images/IMBA.png"); // Укажите ваш файл с фоном
 
-    // Запускаем меню
+    Menu menu(window, "images/IMBA.png"); 
+
+
     menu.run();
 
-    // Проверяем, начата ли новая игра
+
     if (!menu.startNewGame) {
-        return 0; // Если игра не начата, закрываем
+        return 0; 
     }
 
-    // Загружаем карту уровня из JSON
+
     Level level;
     
 
@@ -145,7 +145,7 @@ int main() {
 
 
     
-    // Создаем объект игрока и задаем начальные координаты
+
     Player player("biker.png", level);  player.x = 100; player.y = 100; //player.sprite.setPosition(player.x, player.y);
     
 
