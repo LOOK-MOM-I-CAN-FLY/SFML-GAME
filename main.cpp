@@ -183,8 +183,8 @@ int main() {
     char c; //std::cin>>c;    
     std::cout<<'H,4'; 
    
-    view.setSize(1280, 800);  // Устанавливаем размер камеры, соответствующий размеру окна
-    view.setCenter(player.x, player.y);  // Центрируем камеру на игроке изначально
+    view.setSize(1280, 800); 
+    view.setCenter(player.x, player.y); 
 
     sf::Clock clock;
      
@@ -204,19 +204,19 @@ int main() {
                 monster.update(100*time); 
             }
         }
-            // Проверка состояния босса
+
         for (const auto& monster : allmons) {
             if (monster.the_id == 5 && !monster._isAlive()) {
-                std::cout << "Босс побежден. Игра завершена!" << std::endl;
+                std::cout << "Boss defeated. You won!" << std::endl;
                 window.close();
                 break;
             }
         }
 
-        // Обновляем координаты камеры в соответствии с положением игрока
+
         updateViewForPlayer(player.x, player.y);
         render(window, level, player , allmons , allbonuses);
-        //todo  move to render
+
          
         
          
