@@ -11,7 +11,7 @@
 
 
 void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<Monster>& allmons, std::vector<Bonus>& allbonuses) {
-    window.setView(view);  // Устанавливаем камеру перед отрисовкой
+    window.setView(view); 
     window.clear();
 
 
@@ -53,15 +53,15 @@ void render(sf::RenderWindow& window, Level& level, Player& player, std::vector<
     /*hpbar.setOutlineColor(sf::Color::Green);                // Outline color
     hpbar.setOutlineThickness(3.f);                      // Outline thickness*/
 
-    sf::CircleShape circle(6.f); // Радиус пули 6 пикселей
-    circle.setFillColor(sf::Color::Yellow);           // Цвет заливки - жёлтый
-    circle.setOutlineColor(sf::Color(255, 165, 0));   // Оранжевый цвет обводки
-    circle.setOutlineThickness(2.f);                  // Толщина обводки
+    sf::CircleShape circle(6.f); 
+    circle.setFillColor(sf::Color::Yellow);           
+    circle.setOutlineColor(sf::Color(255, 165, 0));  
+    circle.setOutlineThickness(2.f);
 
-    sf::CircleShape circleMonster(6.f); // Радиус пули 6 пикселей
-    circleMonster.setFillColor(sf::Color::Red);           // Цвет заливки - жёлтый
-    circleMonster.setOutlineColor(sf::Color(255, 165, 0));   // Оранжевый цвет обводки
-    circleMonster.setOutlineThickness(2.f);                  // Толщина обводки
+    sf::CircleShape circleMonster(6.f); 
+    circleMonster.setFillColor(sf::Color::Red);           
+    circleMonster.setOutlineColor(sf::Color(255, 165, 0));   
+    circleMonster.setOutlineThickness(2.f);                  
 
 
 
